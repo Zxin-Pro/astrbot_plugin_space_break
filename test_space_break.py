@@ -24,6 +24,11 @@ def _install_stubs():
                 return fn
             return deco
 
+        def command(self, *a, **k):
+            def deco(fn):
+                return fn
+            return deco
+
         def on_llm_request(self, *a, **k):
             def deco(fn):
                 return fn
