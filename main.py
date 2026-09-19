@@ -8,6 +8,7 @@ _HOLD_RE = re.compile(r"\x00(\d+)\x00")
 _PROTECT_RE = re.compile(
     r"https?://[^\s]+|www\.[^\s]+|\[CQ:[^\]]+\]|\d+(?:,\d+)*"
 )
+_MARK = "_space_break_llm"
 _MULTI_SPACE_RE = re.compile(r"[ \t]{2,}")
 
 _PUNCT_SPACE = set("，,、；;")
@@ -154,7 +155,7 @@ def _chain_comps(chain):
     "astrbot_plugin_space_break",
     "Zxin_Pro",
     "出口空格断句",
-    "1.1.0",
+    "1.2.0",
 )
 class SpaceBreakPlugin(Star):
     def __init__(self, context: Context, config=None):
@@ -174,6 +175,33 @@ class SpaceBreakPlugin(Star):
 
     def _enabled(self) -> bool:
         return bool(self._cfg("enabled", True))
+
+    def _only_llm(self) -> bool:
+        return bool(self._cfg("only_llm", True))
+
+    def _is_llm(self, ev) -> bool:
+        if not self._only_llm():
+            return True
+        try:
+            return bool(getattr(ev, "extra", {}).get(_MARK))
+        except Exception:
+            return False
+
+    def _mark_llm(self, ev) -> None:
+        try:
+            extra = getattr(ev, "extra", None)
+            if extra is None:
+                event = getattr(ev, "event_obj", None)
+                extra = getattr(event, "extra", None) if event else None
+            if extra is None:
+                extra = {}
+                try:
+                    ev.extra = extra
+                except Exception:
+                    return
+            extra[_MARK] = True
+        except Exception:
+            pass
 
     def apply(self, text: str) -> str:
         try:
@@ -225,13 +253,15 @@ class SpaceBreakPlugin(Star):
 
     def _patch_send(self):
         plugin = self
+        only_llm = self._only_llm()
         for cls in self._iter_event_classes():
             if getattr(cls, "_space_break_patched", False):
                 continue
             orig_send = getattr(cls, "send", None)
             if orig_send and callable(orig_send):
                 async def send(ev, chain=None, *args, __orig=orig_send, **kwargs):
-                    plugin._scrub_chain(chain)
+                    if plugin._is_llm(ev):
+                        plugin._scrub_chain(chain)
                     return await __orig(ev, chain, *args, **kwargs)
 
                 cls.send = send
@@ -239,7 +269,8 @@ class SpaceBreakPlugin(Star):
             orig_ss = getattr(cls, "send_streaming", None)
             if orig_ss and callable(orig_ss):
                 async def send_streaming(ev, chain=None, *args, __orig=orig_ss, **kwargs):
-                    plugin._scrub_chain(chain)
+                    if plugin._is_llm(ev):
+                        plugin._scrub_chain(chain)
                     return await __orig(ev, chain, *args, **kwargs)
 
                 cls.send_streaming = send_streaming
@@ -250,6 +281,8 @@ class SpaceBreakPlugin(Star):
                 pass
 
     def _patch_context_send(self):
+        if self._only_llm():
+            return
         try:
             from astrbot.core.star.context import Context as Ctx
         except Exception:
@@ -304,6 +337,8 @@ class SpaceBreakPlugin(Star):
     async def on_decorating_result(self, event: AstrMessageEvent):
         if not self._enabled():
             return
+        if not self._is_llm(event):
+            return
         try:
             result = event.get_result()
         except Exception:
@@ -313,3 +348,11 @@ class SpaceBreakPlugin(Star):
         self._scrub_chain(result)
         self._scrub_chain(getattr(result, "chain", None))
         self._scrub_chain(getattr(result, "result_chain", None))
+
+    @filter.on_llm_request()
+    async def on_llm_request(self, event: AstrMessageEvent, *args, **kwargs):
+        self._mark_llm(event)
+
+    @filter.on_llm_response()
+    async def on_llm_response(self, event: AstrMessageEvent, *args, **kwargs):
+        self._mark_llm(event)

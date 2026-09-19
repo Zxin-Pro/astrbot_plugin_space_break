@@ -22,5 +22,11 @@
     "type": "bool",
     "hint": "呀啊哦呢吧吗嘛啦哈嗯呐哇 后面加空格",
     "default": true
+  },
+  "only_llm": {
+    "description": "只处理大模型回复",
+    "type": "bool",
+    "hint": "开启后只清洗 LLM 回复，其它插件/命令的输出（如额度查询）一律不碰",
+    "default": true
   }
 }

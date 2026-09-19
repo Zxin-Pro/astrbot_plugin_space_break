@@ -24,6 +24,16 @@ def _install_stubs():
                 return fn
             return deco
 
+        def on_llm_request(self, *a, **k):
+            def deco(fn):
+                return fn
+            return deco
+
+        def on_llm_response(self, *a, **k):
+            def deco(fn):
+                return fn
+            return deco
+
     class AstrMessageEvent:
         async def send(self, chain=None, *a, **k):
             return chain
@@ -144,6 +154,7 @@ class T(unittest.TestCase):
 
         p = SpaceBreakPlugin(None, {})
         orig = Base.send_streaming
+        Base._space_break_patched = False
         loop = asyncio.new_event_loop()
         try:
             loop.run_until_complete(p.initialize())
@@ -153,7 +164,66 @@ class T(unittest.TestCase):
         finally:
             loop.close()
 
-    def test_plugin_disabled(self):
+    def _mk_event(self, text_val):
+        class C:
+            pass
+
+        C.text = text_val
+
+        class Res:
+            chain = [C()]
+
+        class Ev:
+            extra = {}
+            def get_result(self):
+                return Res()
+
+        return Ev(), Res
+
+    def test_only_llm_skips_unmarked(self):
+        p = SpaceBreakPlugin(None, {"only_llm": True})
+        ev, Res = self._mk_event("偷看我呀额度还没懂细说下")
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(p.on_decorating_result(ev))
+        finally:
+            loop.close()
+        self.assertEqual(Res.chain[0].text, "偷看我呀额度还没懂细说下")
+
+    def test_only_llm_scrubs_marked(self):
+        p = SpaceBreakPlugin(None, {"only_llm": True})
+        ev, Res = self._mk_event("偷看我呀额度还没懂细说下")
+        p._mark_llm(ev)
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(p.on_decorating_result(ev))
+        finally:
+            loop.close()
+        self.assertEqual(Res.chain[0].text, "偷看我呀 额度还没懂 细说下")
+
+    def test_only_llm_false_scrubs_all(self):
+        p = SpaceBreakPlugin(None, {"only_llm": False})
+        ev, Res = self._mk_event("偷看我呀额度还没懂细说下")
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(p.on_decorating_result(ev))
+        finally:
+            loop.close()
+        self.assertEqual(Res.chain[0].text, "偷看我呀 额度还没懂 细说下")
+
+    def test_ctx_not_patched_when_only_llm(self):
+        from astrbot.core.star.context import Context as Ctx
+
+        p = SpaceBreakPlugin(None, {"only_llm": True})
+        orig = Ctx.send_message
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(p.initialize())
+            self.assertTrue(Ctx.send_message is orig)
+        finally:
+            loop.close()
+
+    def test_disabled(self):
         p = SpaceBreakPlugin(None, {"enabled": False})
         class C:
             text = "偷看我呀额度还没懂细说下"
