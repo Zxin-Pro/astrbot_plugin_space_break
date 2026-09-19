@@ -6,7 +6,7 @@ from astrbot.api.star import Context, Star, register
 _HOLD = "\x00{0}\x00"
 _HOLD_RE = re.compile(r"\x00(\d+)\x00")
 _PROTECT_RE = re.compile(
-    r"https?://[^\s]+|www\.[^\s]+|\[CQ:[^\]]+\]"
+    r"https?://[^\s]+|www\.[^\s]+|\[CQ:[^\]]+\]|\d+(?:,\d+)*"
 )
 _MULTI_SPACE_RE = re.compile(r"[ \t]{2,}")
 
@@ -154,13 +154,14 @@ def _chain_comps(chain):
     "astrbot_plugin_space_break",
     "Zxin_Pro",
     "出口空格断句",
-    "1.0.0",
+    "1.1.0",
 )
 class SpaceBreakPlugin(Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         self.config = config or {}
         self._orig_send = {}
+        self._orig_ss = {}
         self._orig_ctx_send = None
 
     def _cfg(self, key, default):
@@ -235,6 +236,14 @@ class SpaceBreakPlugin(Star):
 
                 cls.send = send
                 self._orig_send[cls] = orig_send
+            orig_ss = getattr(cls, "send_streaming", None)
+            if orig_ss and callable(orig_ss):
+                async def send_streaming(ev, chain=None, *args, __orig=orig_ss, **kwargs):
+                    plugin._scrub_chain(chain)
+                    return await __orig(ev, chain, *args, **kwargs)
+
+                cls.send_streaming = send_streaming
+                self._orig_ss[cls] = orig_ss
             try:
                 cls._space_break_patched = True
             except Exception:
@@ -268,6 +277,12 @@ class SpaceBreakPlugin(Star):
             except Exception:
                 pass
         self._orig_send.clear()
+        for cls, orig in list(self._orig_ss.items()):
+            try:
+                cls.send_streaming = orig
+            except Exception:
+                pass
+        self._orig_ss.clear()
         if self._orig_ctx_send is not None:
             try:
                 from astrbot.core.star.context import Context as Ctx

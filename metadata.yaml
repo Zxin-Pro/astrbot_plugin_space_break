@@ -1,6 +1,6 @@
 name: astrbot_plugin_space_break
 desc: 出口空格断句。发出前把逗号句号改成空格，语气词后断开，连续汉字超限切开。不靠模型自觉。
 help: 装上即生效，发出前处理 Plain 文本。命令、链接、CQ码不切开。
-version: 1.0.0
+version: 1.1.0
 author: Zxin_Pro
 repo: https://github.com/Zxin-Pro/astrbot_plugin_space_break
