@@ -1,0 +1,26 @@
+{
+  "enabled": {
+    "description": "启用出口空格断句",
+    "type": "bool",
+    "hint": "发出前处理文本：逗号句号改空格，连续汉字超限切开",
+    "default": true
+  },
+  "max_run": {
+    "description": "连续汉字上限",
+    "type": "int",
+    "hint": "超过这个长度硬切，默认 12。语气词后会先断，已有空格的句子不会再切碎",
+    "default": 12
+  },
+  "replace_punct": {
+    "description": "逗号句号改空格",
+    "type": "bool",
+    "hint": "，,、；; 改空格，。. 删掉",
+    "default": true
+  },
+  "particle_break": {
+    "description": "语气词后断句",
+    "type": "bool",
+    "hint": "呀啊哦呢吧吗嘛啦哈嗯呐哇 后面加空格",
+    "default": true
+  }
+}
