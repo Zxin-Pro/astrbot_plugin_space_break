@@ -158,7 +158,7 @@ def _chain_comps(chain):
     "astrbot_plugin_space_break",
     "Zxin_Pro",
     "出口空格断句",
-    "1.2.1",
+    "1.2.2",
 )
 class SpaceBreakPlugin(Star):
     def __init__(self, context: Context, config=None):
@@ -331,19 +331,13 @@ class SpaceBreakPlugin(Star):
 
     async def initialize(self):
         logger.info(
-            "[space_break] loaded v1.2.1 only_llm=%s max_run=%s",
+            "[space_break] loaded v%s only_llm=%s max_run=%s",
+            "1.2.2",
             self._only_llm(),
             self._cfg("max_run", 12),
         )
         self._patch_send()
         self._patch_context_send()
-
-    @filter.command("空格测试")
-    async def test_command(self, event: AstrMessageEvent):
-        yield event.plain_result(
-            "原文: 偷看我呀额度还没懂细说下\n处理后: "
-            + break_text("偷看我呀额度还没懂细说下")
-        )
 
     async def terminate(self):
         self._unpatch()
